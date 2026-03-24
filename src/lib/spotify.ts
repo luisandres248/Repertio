@@ -17,6 +17,9 @@ type SpotifyPlaylistPage = {
   items: Array<{
     id?: string
     name?: string
+    description?: string | null
+    external_urls?: { spotify?: string }
+    images?: Array<{ url?: string }>
     owner?: { display_name?: string; id?: string }
     tracks?: { total?: number }
     collaborative?: boolean
@@ -30,15 +33,28 @@ type SpotifyTrackItemsPage = {
   items: Array<{
     track?: {
       id: string | null
+      popularity?: number | null
+      album?: {
+        images?: Array<{ url?: string }>
+      } | null
       artists: Array<{ id: string | null; name: string }>
     } | null
     item?: {
       id: string | null
+      popularity?: number | null
+      album?: {
+        images?: Array<{ url?: string }>
+      } | null
       artists: Array<{ id: string | null; name: string }>
     } | null
     is_local: boolean
   }>
   next: string | null
+}
+
+type SpotifyArtistResponse = {
+  genres?: string[]
+  popularity?: number
 }
 
 async function fetchToken(body: URLSearchParams): Promise<SpotifyTokenResponse> {
@@ -132,9 +148,12 @@ export function hasExpired(session: SpotifySession): boolean {
 }
 
 async function fetchPlaylistTrackCount(accessToken: string, playlistId: string): Promise<number | null> {
-  const response = await fetch(`${SPOTIFY_API_URL}/playlists/${playlistId}/items?limit=1`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  })
+  const response = await fetch(
+    `${SPOTIFY_API_URL}/playlists/${playlistId}/items?limit=1&fields=total`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  )
 
   if (response.status === 403 || response.status === 404) {
     return null
@@ -146,6 +165,110 @@ async function fetchPlaylistTrackCount(accessToken: string, playlistId: string):
 
   const data = (await response.json()) as SpotifyTrackItemsPage
   return data.total ?? 0
+}
+
+async function fetchArtistDetails(accessToken: string, artistId: string): Promise<SpotifyArtistResponse | null> {
+  const response = await fetch(`${SPOTIFY_API_URL}/artists/${artistId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+
+  if (response.status === 403 || response.status === 404) {
+    return null
+  }
+
+  if (!response.ok) {
+    throw new Error(`Spotify artist error: ${response.status} (${artistId})`)
+  }
+
+  return (await response.json()) as SpotifyArtistResponse
+}
+
+async function fetchPlaylistPreview(
+  accessToken: string,
+  playlistId: string,
+): Promise<{
+  sampleArtists: string[]
+  sampleGenres: string[]
+  averagePopularity: number | null
+  previewImageUrl: string | null
+} | null> {
+  const response = await fetch(
+    `${SPOTIFY_API_URL}/playlists/${playlistId}/items?limit=100&fields=items(is_local,item(album(images),popularity,artists(id,name)),track(album(images),popularity,artists(id,name)))`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  )
+
+  if (response.status === 403 || response.status === 404) {
+    return null
+  }
+
+  if (!response.ok) {
+    throw new Error(`Spotify playlist preview error: ${response.status} (${playlistId})`)
+  }
+
+  const data = (await response.json()) as SpotifyTrackItemsPage
+  const artistMap = new Map<string, { name: string; count: number }>()
+  const popularityValues: number[] = []
+  let previewImageUrl: string | null = null
+
+  for (const item of data.items) {
+    const playlistItem = item.item ?? item.track
+    if (!playlistItem || item.is_local) continue
+
+    if (!previewImageUrl) {
+      previewImageUrl = playlistItem.album?.images?.[0]?.url ?? null
+    }
+
+    if (typeof playlistItem.popularity === 'number') {
+      popularityValues.push(playlistItem.popularity)
+    }
+
+    for (const artist of playlistItem.artists) {
+      if (!artist.id) continue
+      const existing = artistMap.get(artist.id)
+      if (existing) {
+        existing.count += 1
+      } else {
+        artistMap.set(artist.id, { name: artist.name, count: 1 })
+      }
+    }
+  }
+
+  const rankedArtists = [...artistMap.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 10)
+  const sampleArtists = rankedArtists.slice(0, 10).map(([, artist]) => artist.name)
+  const genreCounts = new Map<string, number>()
+  const artistIds = rankedArtists.slice(0, 5).map(([artistId]) => artistId)
+
+  const artistDetails = await Promise.all(artistIds.map((artistId) => fetchArtistDetails(accessToken, artistId)))
+  const genreLabels = new Map<string, string>()
+  for (const details of artistDetails) {
+    for (const genre of details?.genres ?? []) {
+      const key = normalizeName(genre)
+      if (!genreLabels.has(key)) {
+        genreLabels.set(key, genre)
+      }
+      genreCounts.set(key, (genreCounts.get(key) ?? 0) + 1)
+    }
+  }
+
+  const sampleGenres = [...genreCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([genre]) => genreLabels.get(genre) ?? genre)
+
+  const averagePopularity = popularityValues.length
+    ? Math.round(popularityValues.reduce((sum, value) => sum + value, 0) / popularityValues.length)
+    : null
+
+  return {
+    sampleArtists,
+    sampleGenres,
+    averagePopularity,
+    previewImageUrl,
+  }
 }
 
 export async function fetchPlaylists(accessToken: string): Promise<SpotifyPlaylist[]> {
@@ -170,14 +293,23 @@ export async function fetchPlaylists(accessToken: string): Promise<SpotifyPlayli
         const tracksTotal = await fetchPlaylistTrackCount(accessToken, item.id)
         if (tracksTotal === null) return null
 
+        const preview = await fetchPlaylistPreview(accessToken, item.id)
+        if (preview === null) return null
+
         return {
           id: item.id,
           name: item.name,
           ownerName: item.owner.display_name ?? 'Unknown owner',
           ownerId: item.owner.id,
+          description: item.description?.trim() ? item.description : null,
+          imageUrl: item.images?.[0]?.url ?? preview.previewImageUrl,
+          spotifyUrl: item.external_urls?.spotify ?? null,
           tracksTotal,
           collaborative: item.collaborative ?? false,
           isPublic: item.public ?? null,
+          sampleArtists: preview.sampleArtists,
+          sampleGenres: preview.sampleGenres,
+          averagePopularity: preview.averagePopularity,
         } satisfies SpotifyPlaylist
       }),
     )
@@ -246,7 +378,6 @@ export async function resolveArtistOnSpotify(
   seedNames: Set<string>,
   description: string,
   whyFits: string,
-  confidence: number,
 ): Promise<ResolvedArtist> {
   const searchUrl = `https://open.spotify.com/search/${encodeURIComponent(name)}`
   const normalizedInput = normalizeName(name)
@@ -261,7 +392,7 @@ export async function resolveArtistOnSpotify(
       name,
       description,
       whyFits,
-      confidence,
+      imageUrl: null,
       spotifyUrl: null,
       searchUrl,
       status: 'not_found',
@@ -269,7 +400,14 @@ export async function resolveArtistOnSpotify(
   }
 
   const data = (await response.json()) as {
-    artists?: { items?: Array<{ id: string; name: string; external_urls?: { spotify?: string } }> }
+    artists?: {
+      items?: Array<{
+        id: string
+        name: string
+        external_urls?: { spotify?: string }
+        images?: Array<{ url?: string }>
+      }>
+    }
   }
 
   const items = data.artists?.items ?? []
@@ -278,7 +416,7 @@ export async function resolveArtistOnSpotify(
       name,
       description,
       whyFits,
-      confidence,
+      imageUrl: null,
       spotifyUrl: null,
       searchUrl,
       status: 'not_found',
@@ -293,7 +431,7 @@ export async function resolveArtistOnSpotify(
       name,
       description,
       whyFits,
-      confidence,
+      imageUrl: best.images?.[0]?.url ?? null,
       spotifyUrl: best.external_urls?.spotify ?? null,
       searchUrl,
       status: 'filtered_duplicate',
@@ -307,7 +445,7 @@ export async function resolveArtistOnSpotify(
     name,
     description,
     whyFits,
-    confidence,
+    imageUrl: best.images?.[0]?.url ?? null,
     spotifyUrl: best.external_urls?.spotify ?? null,
     searchUrl,
     status: ambiguous ? 'ambiguous' : 'matched',

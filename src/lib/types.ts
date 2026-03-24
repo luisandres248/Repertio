@@ -13,9 +13,15 @@ export type SpotifyPlaylist = {
   name: string
   ownerName: string
   ownerId: string
+  description: string | null
+  imageUrl: string | null
+  spotifyUrl: string | null
   tracksTotal: number
   collaborative: boolean
   isPublic: boolean | null
+  sampleArtists: string[]
+  sampleGenres: string[]
+  averagePopularity: number | null
 }
 
 export type SeedArtist = {
@@ -49,7 +55,7 @@ export type ResolvedArtist = {
   name: string
   description: string
   whyFits: string
-  confidence: number
+  imageUrl: string | null
   spotifyUrl: string | null
   searchUrl: string
   status: 'matched' | 'ambiguous' | 'not_found' | 'filtered_duplicate'

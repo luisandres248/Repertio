@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
 import { generateRecommendations } from './lib/gemini'
 import { normalizeName } from './lib/pkce'
@@ -19,7 +19,7 @@ import {
   saveGeminiApiKey,
   saveSpotifySession,
 } from './lib/storage'
-import type { ResolvedGroup, SeedArtist, SpotifyPlaylist, SpotifySession } from './lib/types'
+import type { ResolvedGroup, SpotifyPlaylist, SpotifySession } from './lib/types'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { TermsPage } from './pages/TermsPage'
@@ -84,7 +84,6 @@ function AppHome({
   playlists,
   playlistsLoading,
   playlistsError,
-  playlistsNotice,
   selectedIds,
   onToggleSelection,
   onLogin,
@@ -93,7 +92,9 @@ function AppHome({
   generationStatus,
   generationError,
   results,
-  seedArtists,
+  currentResultIndex,
+  onPrevResult,
+  onNextResult,
 }: {
   session: SpotifySession | null
   authStatus: AuthStatus
@@ -101,7 +102,6 @@ function AppHome({
   playlists: SpotifyPlaylist[]
   playlistsLoading: boolean
   playlistsError: string | null
-  playlistsNotice: string | null
   selectedIds: Set<string>
   onToggleSelection: (playlistId: string) => void
   onLogin: () => void
@@ -110,18 +110,17 @@ function AppHome({
   generationStatus: GenerationStatus
   generationError: string | null
   results: ResolvedGroup[]
-  seedArtists: SeedArtist[]
+  currentResultIndex: number
+  onPrevResult: () => void
+  onNextResult: () => void
 }) {
-  const selectedPlaylists = useMemo(
-    () => playlists.filter((p) => selectedIds.has(p.id)),
-    [playlists, selectedIds],
-  )
+  const currentGroup = results[currentResultIndex] ?? null
 
   if (authStatus === 'loading') {
     return (
       <main className="page">
-        <h1>Repertio</h1>
-        <p>Cargando sesion...</p>
+        <h1>REPERTIO</h1>
+        <p>Cargando...</p>
       </main>
     )
   }
@@ -129,11 +128,11 @@ function AppHome({
   if (!session) {
     return (
       <main className="page">
-        <h1>Repertio</h1>
+        <h1>REPERTIO</h1>
         <p>Descubre artistas nuevos desde tus playlists de Spotify.</p>
         {authError ? <p className="error">{authError}</p> : null}
         <button className="button" onClick={onLogin} disabled={authStatus === 'error'}>
-          Connect Spotify
+          Conectar Spotify
         </button>
       </main>
     )
@@ -141,8 +140,8 @@ function AppHome({
 
   return (
     <main className="page">
-      <h1>Repertio</h1>
-      <p>Sesion Spotify activa.</p>
+      <h1>REPERTIO</h1>
+      <p>Descubre artistas nuevos desde las playlists que ya conoces.</p>
 
       <section className="panel row">
         <div>
@@ -150,75 +149,115 @@ function AppHome({
           <p>Selecciona una o varias playlists para generar recomendaciones.</p>
         </div>
         <button className="button secondary" onClick={onLogout}>
-          Logout
+          Salir
         </button>
       </section>
 
       {playlistsLoading ? <p>Cargando playlists...</p> : null}
       {playlistsError ? <p className="error">{playlistsError}</p> : null}
-      {playlistsNotice ? <p className="notice">{playlistsNotice}</p> : null}
 
       {!playlistsLoading && playlists.length === 0 ? <p>No se encontraron playlists.</p> : null}
 
       {playlists.length > 0 ? (
         <section className="panel">
-          <ul className="playlist-list">
-            {playlists.map((playlist) => (
-              <li key={playlist.id}>
-                <label className="checkbox playlist-item">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(playlist.id)}
-                    onChange={() => onToggleSelection(playlist.id)}
-                  />
-                  <span className="playlist-main">
-                    <strong>{playlist.name}</strong>
-                    <small>
-                      {playlist.ownerName} - {playlist.tracksTotal} tracks
-                    </small>
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
+          <div className="playlist-list-shell">
+            <ul className="playlist-list">
+              {playlists.map((playlist) => (
+                <li key={playlist.id}>
+                  <label className="checkbox playlist-item">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(playlist.id)}
+                      onChange={() => onToggleSelection(playlist.id)}
+                    />
+                    {playlist.imageUrl ? (
+                      <img src={playlist.imageUrl} alt="" className="playlist-cover" />
+                    ) : (
+                      <span className="playlist-cover fallback" />
+                    )}
+                    <span className="playlist-main">
+                      <span className="playlist-headline">
+                        <strong>{playlist.name}</strong>
+                        <small>{playlist.ownerName}</small>
+                        <span className="playlist-stats">
+                          <span>{playlist.tracksTotal} tracks</span>
+                          {playlist.isPublic ? <span>public</span> : <span>private</span>}
+                        {playlist.averagePopularity !== null ? <span>popularidad {playlist.averagePopularity}</span> : null}
+                        </span>
+                      </span>
+                      {playlist.description ? <p className="playlist-description">{playlist.description}</p> : null}
+                      {playlist.sampleArtists.length > 0 ? (
+                        <p className="playlist-meta">
+                          {playlist.sampleArtists.join(' • ')}
+                        </p>
+                      ) : null}
+                      {playlist.sampleGenres.length > 0 ? (
+                        <p className="playlist-meta subtle">
+                          {playlist.sampleGenres.join(' • ')}
+                        </p>
+                      ) : null}
+                      {playlist.spotifyUrl ? (
+                        <a href={playlist.spotifyUrl} target="_blank" rel="noreferrer" className="inline-link">
+                          <svg viewBox="0 0 24 24" aria-hidden="true" className="external-icon">
+                            <path d="M14 5h5v5h-2V8.41l-6.29 6.3-1.42-1.42 6.3-6.29H14V5Z" fill="currentColor" />
+                            <path d="M7 7h5v2H9v6h6v-3h2v5H7V7Z" fill="currentColor" />
+                          </svg>
+                        </a>
+                      ) : null}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       ) : null}
 
       <section className="panel row">
         <div>
           <h2>Generar</h2>
-          <p>
-            Seleccionadas: {selectedPlaylists.length}. Artistas semilla encontrados: {seedArtists.length || 'n/a'}.
-          </p>
+          <p>Elige hasta 5 playlists para generar recomendaciones de artistas.</p>
         </div>
         <button
           className="button"
           onClick={onGenerate}
           disabled={generationStatus === 'running' || selectedIds.size === 0}
         >
-          {generationStatus === 'running' ? 'Generando...' : 'Generate recommendations'}
+          {generationStatus === 'running' ? 'Generando...' : 'Generar recomendaciones'}
         </button>
       </section>
 
       {generationError ? <p className="error">{generationError}</p> : null}
 
-      {results.length > 0 ? (
+      {currentGroup ? (
         <section className="results-grid">
-          {results.map((group) => (
-            <article key={group.id} className="panel">
-              <h3>{group.title}</h3>
-              <p>
-                <strong>Criterio:</strong> {group.criterion}
-              </p>
-              <p>{group.rationale}</p>
+          <div className="carousel-controls">
+            <button className="button secondary" onClick={onPrevResult}>
+              Anterior
+            </button>
+            <span className="carousel-indicator">
+              {currentResultIndex + 1}/{results.length}
+            </span>
+            <button className="button secondary" onClick={onNextResult}>
+              Siguiente
+            </button>
+          </div>
+          <article key={currentGroup.id} className="panel">
+              <div className="recommendation-header">
+                <h3>{currentGroup.title}</h3>
+                <p className="recommendation-criterion">{currentGroup.criterion}</p>
+              </div>
+              <p className="recommendation-rationale">{currentGroup.rationale}</p>
               <ul>
-                {group.artists.map((artist) => (
-                  <li key={`${group.id}-${artist.name}`} className="artist-item">
-                    <div>
-                      <strong>{artist.name}</strong> <small>({Math.round(artist.confidence * 100)}%)</small>
-                      <p>{artist.description}</p>
-                      <p>{artist.whyFits}</p>
-                      <small>Estado: {artist.status}</small>
+                {currentGroup.artists.map((artist) => (
+                  <li key={`${currentGroup.id}-${artist.name}`} className="artist-item">
+                    <div className="artist-main">
+                      {artist.imageUrl ? <img src={artist.imageUrl} alt="" className="artist-image" /> : <span className="artist-image fallback" />}
+                      <div className="artist-copy">
+                        <strong>{artist.name}</strong>
+                        <p className="artist-description">{artist.description}</p>
+                        <p className="artist-fit">{artist.whyFits}</p>
+                      </div>
                     </div>
                     <div className="artist-links">
                       {artist.spotifyUrl ? (
@@ -233,8 +272,7 @@ function AppHome({
                   </li>
                 ))}
               </ul>
-            </article>
-          ))}
+          </article>
         </section>
       ) : null}
     </main>
@@ -249,11 +287,10 @@ function App() {
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([])
   const [playlistsLoading, setPlaylistsLoading] = useState(false)
   const [playlistsError, setPlaylistsError] = useState<string | null>(null)
-  const [playlistsNotice, setPlaylistsNotice] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  const [seedArtists, setSeedArtists] = useState<SeedArtist[]>([])
   const [results, setResults] = useState<ResolvedGroup[]>([])
+  const [currentResultIndex, setCurrentResultIndex] = useState(0)
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus>('idle')
   const [generationError, setGenerationError] = useState<string | null>(null)
 
@@ -297,12 +334,10 @@ function App() {
     async function run() {
       setPlaylistsLoading(true)
       setPlaylistsError(null)
-      setPlaylistsNotice(null)
 
       try {
         const data = await fetchPlaylists(activeSession.accessToken)
         setPlaylists(data)
-        setPlaylistsNotice('Solo se muestran playlists cuyos tracks Spotify permite leer con tu sesion actual.')
       } catch (error) {
         setPlaylistsError(error instanceof Error ? error.message : 'No se pudieron cargar playlists')
       } finally {
@@ -333,8 +368,8 @@ function App() {
     setSession(null)
     setPlaylists([])
     setSelectedIds(new Set())
-    setSeedArtists([])
     setResults([])
+    setCurrentResultIndex(0)
     setAuthStatus('anonymous')
   }
 
@@ -378,7 +413,7 @@ function App() {
     if (!session) return
     if (!geminiApiKey.trim()) {
       setGenerationStatus('error')
-      setGenerationError('Gemini API key faltante. Configurala en Settings.')
+      setGenerationError('Falta la Gemini API key. Configúrala en Configuración.')
       return
     }
 
@@ -392,12 +427,12 @@ function App() {
       setGenerationStatus('running')
       setGenerationError(null)
       setResults([])
+      setCurrentResultIndex(0)
 
       const playlistIds = [...selectedIds]
       const selectedPlaylists = playlists.filter((p) => selectedIds.has(p.id))
 
       const seeds = await fetchSeedArtists(session.accessToken, playlistIds)
-      setSeedArtists(seeds)
 
       if (seeds.length === 0) {
         throw new Error('No se encontraron artistas semilla en las playlists seleccionadas.')
@@ -424,7 +459,6 @@ function App() {
               seedNames,
               artist.description,
               artist.whyFits,
-              artist.confidence,
             ),
           ),
         )
@@ -453,11 +487,20 @@ function App() {
       }
 
       setResults(resolvedGroups)
+      setCurrentResultIndex(0)
       setGenerationStatus('done')
     } catch (error) {
       setGenerationStatus('error')
       setGenerationError(error instanceof Error ? error.message : 'Fallo en la generacion')
     }
+  }
+
+  const handlePrevResult = () => {
+    setCurrentResultIndex((prev) => (results.length === 0 ? 0 : (prev - 1 + results.length) % results.length))
+  }
+
+  const handleNextResult = () => {
+    setCurrentResultIndex((prev) => (results.length === 0 ? 0 : (prev + 1) % results.length))
   }
 
   return (
@@ -467,14 +510,14 @@ function App() {
           <Link to="/" className="brand">
             <img src="/logo-mark.svg" alt="" className="brand-mark" />
             <span className="brand-copy">
-              <span className="brand-name">Repertio</span>
-              <span className="brand-tagline">Curaduria musical de camara imperial</span>
+              <span className="brand-name">REPERTIO</span>
+              <span className="brand-tagline">Recomendaciones desde tus playlists</span>
             </span>
           </Link>
           <nav>
-            <Link to="/settings">Settings</Link>
-            <Link to="/privacy">Privacy</Link>
-            <Link to="/terms">Terms</Link>
+            <Link to="/settings" className="settings-link">
+              Configuración
+            </Link>
           </nav>
         </header>
 
@@ -489,7 +532,6 @@ function App() {
                 playlists={playlists}
                 playlistsLoading={playlistsLoading}
                 playlistsError={playlistsError}
-                playlistsNotice={playlistsNotice}
                 selectedIds={selectedIds}
                 onToggleSelection={handleToggleSelection}
                 onLogin={handleLogin}
@@ -498,7 +540,9 @@ function App() {
                 generationStatus={generationStatus}
                 generationError={generationError}
                 results={results}
-                seedArtists={seedArtists}
+                currentResultIndex={currentResultIndex}
+                onPrevResult={handlePrevResult}
+                onNextResult={handleNextResult}
               />
             }
           />
@@ -519,6 +563,14 @@ function App() {
           <Route path="/terms" element={<TermsPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
+
+        <footer className="footer">
+          <p className="footer-copy">REPERTIO</p>
+          <div className="footer-links">
+            <Link to="/privacy">Privacy</Link>
+            <Link to="/terms">Terms</Link>
+          </div>
+        </footer>
       </div>
     </BrowserRouter>
   )

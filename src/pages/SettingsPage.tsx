@@ -16,7 +16,7 @@ export function SettingsPage({
   return (
     <main className="page settings-page">
       <section className="hero-panel">
-        <p className="eyebrow">Settings</p>
+        <p className="eyebrow">Configuración</p>
         <h1>Gemini BYOK</h1>
         <p className="hero-copy">
           Repertio usa tu propia Gemini API key para generar recomendaciones desde el navegador. No se envía a
@@ -30,7 +30,7 @@ export function SettingsPage({
             <h2>Clave local</h2>
             <p>
               La app necesita la key guardada en este navegador para poder ejecutar la búsqueda cuando presionas
-              Generate recommendations.
+              Generar recomendaciones.
             </p>
           </div>
 

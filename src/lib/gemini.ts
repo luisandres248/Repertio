@@ -14,7 +14,7 @@ const groupSchema = z.object({
   title: z.string().min(1),
   criterion: z.string().min(1),
   rationale: z.string().min(1),
-  recommendedArtists: z.array(recommendedArtistSchema).min(1),
+  recommendedArtists: z.array(recommendedArtistSchema).min(3).max(5),
 })
 
 const responseSchema = z.object({
@@ -36,11 +36,12 @@ function buildPrompt(seedArtists: SeedArtist[], playlistNames: string[]): string
     'Reglas:',
     '1) Genera 4 grupos distintos.',
     '2) Cada grupo con title, criterion, rationale y recommendedArtists.',
-    '3) Cada artista con name, description, whyFits, confidence.',
-    '4) No recomiendes artistas ya presentes en seeds.',
-    '5) No repitas artistas entre grupos.',
-    '6) Si no estas seguro de un artista, no lo incluyas.',
-    '7) Responde SOLO JSON valido para el schema.',
+    '3) Cada grupo debe tener entre 3 y 5 artistas recomendados. Minimo 3.',
+    '4) Cada artista con name, description, whyFits, confidence.',
+    '5) No recomiendes artistas ya presentes en seeds.',
+    '6) No repitas artistas entre grupos.',
+    '7) Si no estas seguro de un artista, no lo incluyas.',
+    '8) Responde SOLO JSON valido para el schema.',
   ].join('\n')
 }
 

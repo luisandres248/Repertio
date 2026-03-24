@@ -19,8 +19,8 @@ export function PrivacyPage() {
         en servidores de Meriland.
       </p>
       <p>
-        Por defecto no se guarda la API key. Solo se guarda localmente en tu navegador si activas la opcion "Recordar en
-        este navegador".
+        La API key solo se guarda localmente en este navegador cuando eliges guardarla desde Settings, y puedes
+        eliminarla en cualquier momento con la opcion Limpiar clave.
       </p>
 
       <h2>Que se envia a Gemini</h2>
