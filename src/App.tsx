@@ -11,7 +11,14 @@ import {
   resolveArtistOnSpotify,
   startSpotifyLogin,
 } from './lib/spotify'
-import { clearSpotifySession, loadGeminiApiKey, loadSpotifySession, saveGeminiApiKey, saveSpotifySession } from './lib/storage'
+import {
+  clearGeminiApiKey,
+  clearSpotifySession,
+  loadGeminiApiKey,
+  loadSpotifySession,
+  saveGeminiApiKey,
+  saveSpotifySession,
+} from './lib/storage'
 import type { ResolvedGroup, SeedArtist, SpotifyPlaylist, SpotifySession } from './lib/types'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -251,7 +258,7 @@ function App() {
   const [generationError, setGenerationError] = useState<string | null>(null)
 
   const [geminiApiKey, setGeminiApiKey] = useState('')
-  const [rememberGeminiKey, setRememberGeminiKey] = useState(false)
+  const [settingsNotice, setSettingsNotice] = useState<string | null>(null)
 
   useEffect(() => {
     const saved = loadSpotifySession()
@@ -281,7 +288,6 @@ function App() {
 
     const key = loadGeminiApiKey()
     setGeminiApiKey(key)
-    setRememberGeminiKey(Boolean(key))
   }, [])
 
   useEffect(() => {
@@ -346,7 +352,26 @@ function App() {
   }
 
   const handleSaveSettings = () => {
-    saveGeminiApiKey(geminiApiKey, rememberGeminiKey)
+    if (!geminiApiKey.trim()) {
+      setSettingsNotice('Ingresa una Gemini API key valida antes de guardarla.')
+      return
+    }
+
+    const normalizedKey = geminiApiKey.trim()
+    saveGeminiApiKey(normalizedKey)
+    setGeminiApiKey(normalizedKey)
+    setSettingsNotice('Gemini API key guardada localmente en este navegador.')
+  }
+
+  const handleClearSettings = () => {
+    clearGeminiApiKey()
+    setGeminiApiKey('')
+    setSettingsNotice('Gemini API key eliminada de este navegador.')
+  }
+
+  const handleApiKeyChange = (value: string) => {
+    setGeminiApiKey(value)
+    setSettingsNotice(null)
   }
 
   const handleGenerate = async () => {
@@ -440,7 +465,11 @@ function App() {
       <div className="shell">
         <header className="topbar">
           <Link to="/" className="brand">
-            Repertio
+            <img src="/logo-mark.svg" alt="" className="brand-mark" />
+            <span className="brand-copy">
+              <span className="brand-name">Repertio</span>
+              <span className="brand-tagline">Curaduria musical de camara imperial</span>
+            </span>
           </Link>
           <nav>
             <Link to="/settings">Settings</Link>
@@ -479,10 +508,10 @@ function App() {
             element={
               <SettingsPage
                 apiKey={geminiApiKey}
-                rememberApiKey={rememberGeminiKey}
-                onApiKeyChange={setGeminiApiKey}
-                onRememberChange={setRememberGeminiKey}
+                notice={settingsNotice}
+                onApiKeyChange={handleApiKeyChange}
                 onSave={handleSaveSettings}
+                onClear={handleClearSettings}
               />
             }
           />

@@ -19,5 +19,4 @@ export const STORAGE_KEYS = {
   pkceVerifier: 'pkce_verifier',
   oauthState: 'oauth_state',
   geminiApiKey: 'gemini_api_key',
-  rememberGeminiKey: 'remember_gemini_key',
 } as const

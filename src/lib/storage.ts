@@ -23,18 +23,13 @@ export function clearSpotifySession(): void {
 }
 
 export function loadGeminiApiKey(): string {
-  const remember = localStorage.getItem(STORAGE_KEYS.rememberGeminiKey) === 'true'
-  if (!remember) return ''
   return localStorage.getItem(STORAGE_KEYS.geminiApiKey) ?? ''
 }
 
-export function saveGeminiApiKey(value: string, remember: boolean): void {
-  if (remember) {
-    localStorage.setItem(STORAGE_KEYS.rememberGeminiKey, 'true')
-    localStorage.setItem(STORAGE_KEYS.geminiApiKey, value)
-    return
-  }
+export function saveGeminiApiKey(value: string): void {
+  localStorage.setItem(STORAGE_KEYS.geminiApiKey, value)
+}
 
-  localStorage.setItem(STORAGE_KEYS.rememberGeminiKey, 'false')
+export function clearGeminiApiKey(): void {
   localStorage.removeItem(STORAGE_KEYS.geminiApiKey)
 }

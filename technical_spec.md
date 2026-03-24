@@ -562,7 +562,6 @@ error
 settingsStore
 theme
 geminiApiKey
-rememberGeminiKey
 groupCount
 artistsPerGroup
 preferUnderground
