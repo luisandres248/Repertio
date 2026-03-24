@@ -1,37 +1,60 @@
-# Repertio
+# REPERTIO
 
-App web (React + Vite + TypeScript) para descubrir artistas nuevos a partir de tus playlists de Spotify, con recomendaciones generadas por Gemini (BYOK).
+REPERTIO es una aplicación web estática para descubrir artistas nuevos a partir de playlists de Spotify. El usuario inicia sesión con Spotify, selecciona playlists accesibles, la app extrae artistas semilla desde esas playlists y genera grupos de recomendaciones usando Gemini con BYOK.
 
-## Requisitos
+## Qué hace
 
-- Node.js 20+
-- Una app registrada en Spotify Developer
+- Autenticación con Spotify mediante Authorization Code + PKCE.
+- Lectura de playlists del usuario y selección de hasta 5 playlists.
+- Extracción de artistas semilla desde los items de cada playlist.
+- Generación de recomendaciones agrupadas con Gemini.
+- Resolución de artistas recomendados contra Spotify para obtener enlaces e imágenes.
+- Interfaz frontend-only, sin backend propio.
 
-## Configuracion local
+## Stack
 
-1. Copia `.env.example` a `.env`.
-2. Completa estas variables:
-   - `VITE_SPOTIFY_CLIENT_ID`: client id de tu app de Spotify.
-   - `VITE_SPOTIFY_REDIRECT_URI`: URL de callback registrada en Spotify (ejemplo local: `http://localhost:5173/callback`).
-3. En Spotify Developer, agrega exactamente la misma redirect URI.
+- React 19
+- Vite
+- TypeScript
+- React Router
+- Zod
+- Spotify Web API
+- Gemini API
 
-## Instalar y correr
+## Arquitectura
 
-```bash
-npm install
-npm run dev
-```
+La app corre completamente en el navegador y se sirve como sitio estático. Spotify se usa para login, lectura de playlists y enriquecimiento de artistas. Gemini se usa para generar recomendaciones estructuradas a partir de los artistas detectados en las playlists seleccionadas.
 
-## Build
+No hay servidor de aplicación ni base de datos. Los datos de sesión de Spotify se guardan en `sessionStorage` y la Gemini API key se guarda localmente en el navegador cuando el usuario la decide guardar.
 
-```bash
-npm run build
-npm run preview
-```
+## Integraciones
 
-## Seguridad y datos
+### Spotify
 
-- No se usa `client_secret` de Spotify en frontend (flujo PKCE).
-- La API key de Gemini la ingresa el usuario (BYOK).
-- La key de Gemini no se guarda por defecto; opcionalmente puede guardarse en `localStorage`.
-- La sesion/token de Spotify se guarda en `sessionStorage`.
+Se usa para:
+
+- login OAuth con PKCE
+- listar playlists
+- leer items de playlists
+- buscar artistas
+- obtener metadata adicional de artistas
+
+### Gemini
+
+Se usa con una API key provista por el usuario para generar recomendaciones agrupadas en formato JSON estricto.
+
+## Estado funcional
+
+La app ya cubre el flujo principal de extremo a extremo:
+
+1. Login con Spotify.
+2. Selección de playlists.
+3. Generación de recomendaciones.
+4. Navegación de grupos recomendados.
+5. Apertura de artistas en Spotify.
+
+## Notas
+
+- La app está pensada para ser desplegada como frontend estático.
+- No se usa `client_secret` de Spotify en el frontend.
+- La Gemini API key no se envía a ningún servidor propio.

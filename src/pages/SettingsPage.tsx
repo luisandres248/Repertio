@@ -20,20 +20,12 @@ export function SettingsPage({
         <h1>Gemini BYOK</h1>
         <p className="hero-copy">
           Repertio usa tu propia Gemini API key para generar recomendaciones desde el navegador. No se envía a
-          servidores de Meriland y no forma parte del login de Spotify.
+          ningún servidor.
         </p>
       </section>
 
       <section className="settings-layout">
         <section className="panel settings-main">
-          <div className="section-heading">
-            <h2>Clave local</h2>
-            <p>
-              La app necesita la key guardada en este navegador para poder ejecutar la búsqueda cuando presionas
-              Generar recomendaciones.
-            </p>
-          </div>
-
           <form className="settings-form" autoComplete="off" onSubmit={(event) => event.preventDefault()}>
             <label className="field" htmlFor="gemini-key">
               Gemini API key
@@ -52,11 +44,6 @@ export function SettingsPage({
               data-lpignore="true"
               data-1p-ignore="true"
             />
-
-            <p className="muted">
-              Si la guardas, queda disponible solo en este navegador mediante `localStorage`. El botón Limpiar la
-              elimina por completo.
-            </p>
 
             <div className="button-row">
               <button className="button" type="button" onClick={onSave}>
@@ -86,20 +73,6 @@ export function SettingsPage({
             <li>Guarda la key y vuelve a la pantalla principal.</li>
           </ol>
         </section>
-      </section>
-
-      <section className="panel">
-        <div className="section-heading">
-          <h2>Seguridad y alcance</h2>
-          <p>El comportamiento actual del producto es este.</p>
-        </div>
-        <ul className="bullet-grid">
-          <li>La Gemini API key se usa solo desde tu navegador para llamar a Gemini.</li>
-          <li>La key no se reenvía a ningún backend propio porque la app es estática.</li>
-          <li>Los tokens de Spotify no se envían a Gemini.</li>
-          <li>Limpiar clave borra la key guardada del navegador actual.</li>
-          <li>El campo intenta evitar sugerencias de password managers, aunque eso depende del navegador y sus extensiones.</li>
-        </ul>
       </section>
     </main>
   )
