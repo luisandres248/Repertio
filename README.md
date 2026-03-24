@@ -1,73 +1,37 @@
-# React + TypeScript + Vite
+# Repertio
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+App web (React + Vite + TypeScript) para descubrir artistas nuevos a partir de tus playlists de Spotify, con recomendaciones generadas por Gemini (BYOK).
 
-Currently, two official plugins are available:
+## Requisitos
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 20+
+- Una app registrada en Spotify Developer
 
-## React Compiler
+## Configuracion local
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Copia `.env.example` a `.env`.
+2. Completa estas variables:
+   - `VITE_SPOTIFY_CLIENT_ID`: client id de tu app de Spotify.
+   - `VITE_SPOTIFY_REDIRECT_URI`: URL de callback registrada en Spotify (ejemplo local: `http://localhost:5173/callback`).
+3. En Spotify Developer, agrega exactamente la misma redirect URI.
 
-## Expanding the ESLint configuration
+## Instalar y correr
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Build
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
+npm run preview
 ```
+
+## Seguridad y datos
+
+- No se usa `client_secret` de Spotify en frontend (flujo PKCE).
+- La API key de Gemini la ingresa el usuario (BYOK).
+- La key de Gemini no se guarda por defecto; opcionalmente puede guardarse en `localStorage`.
+- La sesion/token de Spotify se guarda en `sessionStorage`.
