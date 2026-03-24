@@ -15,19 +15,24 @@ type SpotifyTokenResponse = {
 
 type SpotifyPlaylistPage = {
   items: Array<{
-    id: string
-    name: string
-    owner: { display_name: string; id: string }
-    tracks: { total: number }
-    collaborative: boolean
-    public: boolean | null
+    id?: string
+    name?: string
+    owner?: { display_name?: string; id?: string }
+    tracks?: { total?: number }
+    collaborative?: boolean
+    public?: boolean | null
   }>
   next: string | null
 }
 
 type SpotifyTrackItemsPage = {
+  total?: number
   items: Array<{
-    track: {
+    track?: {
+      id: string | null
+      artists: Array<{ id: string | null; name: string }>
+    } | null
+    item?: {
       id: string | null
       artists: Array<{ id: string | null; name: string }>
     } | null
@@ -126,6 +131,23 @@ export function hasExpired(session: SpotifySession): boolean {
   return Date.now() > session.expiresAt - 60_000
 }
 
+async function fetchPlaylistTrackCount(accessToken: string, playlistId: string): Promise<number | null> {
+  const response = await fetch(`${SPOTIFY_API_URL}/playlists/${playlistId}/items?limit=1`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+
+  if (response.status === 403 || response.status === 404) {
+    return null
+  }
+
+  if (!response.ok) {
+    throw new Error(`Spotify playlist probe error: ${response.status} (${playlistId})`)
+  }
+
+  const data = (await response.json()) as SpotifyTrackItemsPage
+  return data.total ?? 0
+}
+
 export async function fetchPlaylists(accessToken: string): Promise<SpotifyPlaylist[]> {
   const playlists: SpotifyPlaylist[] = []
   let nextUrl: string | null = `${SPOTIFY_API_URL}/me/playlists?limit=50`
@@ -141,17 +163,26 @@ export async function fetchPlaylists(accessToken: string): Promise<SpotifyPlayli
 
     const data = (await response.json()) as SpotifyPlaylistPage
 
-    playlists.push(
-      ...data.items.map((item) => ({
-        id: item.id,
-        name: item.name,
-        ownerName: item.owner.display_name,
-        ownerId: item.owner.id,
-        tracksTotal: item.tracks.total,
-        collaborative: item.collaborative,
-        isPublic: item.public,
-      })),
+    const currentPage = await Promise.all(
+      data.items.map(async (item) => {
+        if (!item.id || !item.name || !item.owner?.id) return null
+
+        const tracksTotal = await fetchPlaylistTrackCount(accessToken, item.id)
+        if (tracksTotal === null) return null
+
+        return {
+          id: item.id,
+          name: item.name,
+          ownerName: item.owner.display_name ?? 'Unknown owner',
+          ownerId: item.owner.id,
+          tracksTotal,
+          collaborative: item.collaborative ?? false,
+          isPublic: item.public ?? null,
+        } satisfies SpotifyPlaylist
+      }),
     )
+
+    playlists.push(...currentPage.filter((item): item is SpotifyPlaylist => item !== null))
 
     nextUrl = data.next
   }
@@ -166,7 +197,7 @@ export async function fetchSeedArtists(
   const counts = new Map<string, SeedArtist>()
 
   for (const playlistId of playlistIds) {
-    let nextUrl: string | null = `${SPOTIFY_API_URL}/playlists/${playlistId}/tracks?limit=100`
+    let nextUrl: string | null = `${SPOTIFY_API_URL}/playlists/${playlistId}/items?limit=100`
 
     while (nextUrl) {
       const response = await fetch(nextUrl, {
@@ -174,14 +205,15 @@ export async function fetchSeedArtists(
       })
 
       if (!response.ok) {
-        throw new Error(`Spotify playlist tracks error: ${response.status}`)
+        throw new Error(`Spotify playlist tracks error: ${response.status} (${playlistId})`)
       }
 
       const data = (await response.json()) as SpotifyTrackItemsPage
       for (const item of data.items) {
-        if (!item.track || item.is_local) continue
+        const playlistItem = item.item ?? item.track
+        if (!playlistItem || item.is_local) continue
 
-        for (const artist of item.track.artists) {
+        for (const artist of playlistItem.artists) {
           const key = normalizeName(artist.name)
           const existing = counts.get(key)
 

@@ -77,6 +77,7 @@ function AppHome({
   playlists,
   playlistsLoading,
   playlistsError,
+  playlistsNotice,
   selectedIds,
   onToggleSelection,
   onLogin,
@@ -93,6 +94,7 @@ function AppHome({
   playlists: SpotifyPlaylist[]
   playlistsLoading: boolean
   playlistsError: string | null
+  playlistsNotice: string | null
   selectedIds: Set<string>
   onToggleSelection: (playlistId: string) => void
   onLogin: () => void
@@ -147,6 +149,7 @@ function AppHome({
 
       {playlistsLoading ? <p>Cargando playlists...</p> : null}
       {playlistsError ? <p className="error">{playlistsError}</p> : null}
+      {playlistsNotice ? <p className="notice">{playlistsNotice}</p> : null}
 
       {!playlistsLoading && playlists.length === 0 ? <p>No se encontraron playlists.</p> : null}
 
@@ -239,6 +242,7 @@ function App() {
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([])
   const [playlistsLoading, setPlaylistsLoading] = useState(false)
   const [playlistsError, setPlaylistsError] = useState<string | null>(null)
+  const [playlistsNotice, setPlaylistsNotice] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const [seedArtists, setSeedArtists] = useState<SeedArtist[]>([])
@@ -287,10 +291,12 @@ function App() {
     async function run() {
       setPlaylistsLoading(true)
       setPlaylistsError(null)
+      setPlaylistsNotice(null)
 
       try {
         const data = await fetchPlaylists(activeSession.accessToken)
         setPlaylists(data)
+        setPlaylistsNotice('Solo se muestran playlists cuyos tracks Spotify permite leer con tu sesion actual.')
       } catch (error) {
         setPlaylistsError(error instanceof Error ? error.message : 'No se pudieron cargar playlists')
       } finally {
@@ -454,6 +460,7 @@ function App() {
                 playlists={playlists}
                 playlistsLoading={playlistsLoading}
                 playlistsError={playlistsError}
+                playlistsNotice={playlistsNotice}
                 selectedIds={selectedIds}
                 onToggleSelection={handleToggleSelection}
                 onLogin={handleLogin}

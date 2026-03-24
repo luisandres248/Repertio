@@ -22,7 +22,7 @@ Gemini se usará con generateContent y responseMimeType application/json más re
 
 Stack exacto
 Frontend:
-React 18
+React 19
 Vite
 TypeScript
 CSS Modules o CSS plano con variables CSS
@@ -100,17 +100,13 @@ GET /me/playlists
 Uso: listar playlists del usuario autenticado, propias o seguidas.
 Notas: paginado con limit y offset; incluir privadas con playlist-read-private; incluir colaborativas con playlist-read-collaborative.
 
-GET /playlists/{playlist_id}/tracks o equivalente de playlist items
+GET /playlists/{playlist_id}/items
 Uso: leer items de la playlist.
-Notas: Spotify documenta que este endpoint es accesible solo si el usuario es owner o collaborator de esa playlist; si no, puede devolver 403. Este punto justifica que el input sea selección de playlists accesibles, no una URL cualquiera.
+Notas: la implementacion actual usa el endpoint `items`, alineado con la documentacion vigente de playlist contents. El frontend filtra el selector a playlists cuyos items Spotify permite leer con la sesion actual; si una playlist devuelve 403 o 404 al consultar `items`, no se ofrece para seleccion.
 
 GET /search?q=...&type=artist
 Uso: resolver artistas recomendados por Gemini en el catálogo de Spotify.
 Notas: también recuerda la política de no usar contenido de Spotify para entrenar ML/IA.
-
-GET /artists/{id}
-Uso: enriquecer el artista resuelto con géneros, popularidad, imagen y URL.
-Notas: útil para cards y validaciones básicas.
 
 Modelo de datos interno
 SpotifySession
@@ -754,7 +750,7 @@ No usar imágenes obligatorias en cada card si quieres máxima ligereza.
 
 Riesgos principales
 
-Restricción del endpoint de playlist items para playlists no propias/no colaborativas. Ya mitigado con login obligatorio + selector desde /me/playlists.
+Restricción del endpoint de playlist items para ciertas playlists visibles en `/me/playlists`. Mitigado validando acceso real a `GET /playlists/{playlist_id}/items` antes de mostrar la playlist como seleccionable.
 Hallucinaciones o nombres imprecisos de Gemini. Mitigado con responseSchema + validación + resolución Spotify.
 Manejo inseguro de tokens/API keys en frontend. Mitigado con PKCE, sessionStorage y CSP.
 Coste o latencia de Gemini si la lista completa de seeds crece mucho. Mitigado en V1 con límites de playlists/tracks y se revisa compresión en V2 si fuera necesario.

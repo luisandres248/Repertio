@@ -96,6 +96,11 @@ a:hover {
   font-weight: 600;
 }
 
+.notice {
+  color: #365f59;
+  font-weight: 600;
+}
+
 .input {
   width: 100%;
   padding: 0.6rem;
